@@ -1,33 +1,90 @@
-import { Calendar } from "@/components/calendar";
-import { Container, TimePicker, TimePickerHeader, TimePickerItem, TimePickerList } from "./styles";
+import { Button, Text, TextArea, TextInput } from "@ignite-ui/react";
+import { ConfirmForm, FormActions, FormError, FormHeader } from "./styles";
+import { CalendarBlank, Clock } from "phosphor-react";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import dayjs from "dayjs";
+import { useRouter } from "next/router";
+import { api } from "@/lib/axios";
 
-export function CalendarStep() {
-    const isDateSelected = true
+const confirmFormSchema = z.object({
+    name: z.string().min(3, { message: 'O nome precisa de no mínimo 3 caracteres' }),
+    email: z.string().email({ message: 'digite um e-mail valido' }),
+    observations: z.string().nullable()
+})
+
+type ConfirmFormData = z.infer<typeof confirmFormSchema>
+
+interface ConfirmStepProps {
+    schedulingDate: Date
+    onCancelConfirmation: () => void
+}
+
+export function ConfirmStep({ schedulingDate, onCancelConfirmation }: ConfirmStepProps) {
+
+    const { register, handleSubmit, formState: { isSubmitting, errors } } = useForm<ConfirmFormData>({
+        resolver: zodResolver(confirmFormSchema)
+    })
+
+    const router = useRouter()
+    const username = String(router.query.username)
+
+    async function handleConfirmScheduling(data: ConfirmFormData) {
+        const { email, name, observations } = data
+
+        await api.post(`/users/${username}/schedule`, {
+            name,
+            email,
+            observations,
+            date: schedulingDate
+        })
+
+        onCancelConfirmation()
+    }
+
+
+    const describedDate = dayjs(schedulingDate).format('DD[ de ]MMM[ de ]YYYY')
+    const describeTime = dayjs(schedulingDate).format('HH:mm[h]')
 
     return (
-        <Container isTimePickerOpen={isDateSelected}>
-            <Calendar />
+        <ConfirmForm as="form" onSubmit={handleSubmit(handleConfirmScheduling)}>
+            <FormHeader>
+                <Text>
+                    <CalendarBlank />
+                    {describedDate}
+                </Text>
+                <Text>
+                    <Clock />
+                    {describeTime}
+                </Text>
+            </FormHeader>
 
-            {isDateSelected && (
-                <TimePicker>
-                    <TimePickerHeader>
-                        Terça-feira <span>20 de setembro</span>
-                    </TimePickerHeader>
-                    <TimePickerList>
-                        <TimePickerItem>08:00</TimePickerItem>
-                        <TimePickerItem>09:00</TimePickerItem>
-                        <TimePickerItem>10:00</TimePickerItem>
-                        <TimePickerItem>11:00</TimePickerItem>
-                        <TimePickerItem>12:00</TimePickerItem>
-                        <TimePickerItem>13:00</TimePickerItem>
-                        <TimePickerItem>14:00</TimePickerItem>
-                        <TimePickerItem>15:00</TimePickerItem>
-                        <TimePickerItem>16:00</TimePickerItem>
-                        <TimePickerItem>17:00</TimePickerItem>
-                        <TimePickerItem>18:00</TimePickerItem>
-                    </TimePickerList>
-                </TimePicker>
-            )}
-        </Container>
+            <label>
+                <Text size="sm">Nome Completo</Text>
+                <TextInput type="Text" placeholder="seu nome" {...register('name')} />
+                {errors.name && (
+                    <FormError size='sm'>{errors.name.message}</FormError>
+                )}
+            </label>
+
+            <label>
+                <Text size="sm">Endereço de e-mail</Text>
+                <TextInput type="email" placeholder="user@example.com" {...register('email')} />
+                {errors.email && (
+                    <FormError size='sm'>{errors.email.message}</FormError>
+                )}
+            </label>
+
+            <label>
+                <Text size="sm">Observações</Text>
+                <TextArea {...register('observations')} />
+            </label>
+
+            <FormActions>
+                <Button type="button" variant="tertiary" onClick={onCancelConfirmation}>Cancelar</Button>
+                <Button type="submit" disabled={isSubmitting}>Confirmar</Button>
+            </FormActions>
+        </ConfirmForm>
     )
 }
